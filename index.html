@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07110d">
+  <title>KORA MAP | ملاعب طنطا</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root{--bg:#07110d;--panel:#101d17;--panel2:#14251c;--green:#a3ff3f;--muted:#9aada1;--line:#263b2e;--white:#f4f8f4;--red:#ff6868}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--white);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+    header{height:68px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:#09150f}
+    .brand{font-weight:900;font-size:21px;letter-spacing:1px}.brand span{color:var(--green)}.tag{font-size:11px;color:var(--muted);margin-top:2px}
+    button,.btn{border:0;border-radius:12px;padding:12px 15px;background:var(--green);color:#10200f;font-weight:800;cursor:pointer}
+    button.secondary{background:#203329;color:var(--white);border:1px solid var(--line)}button.danger{background:#4b2222;color:#fff}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    main{max-width:1200px;margin:auto;padding:14px;display:grid;grid-template-columns:1fr;gap:14px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.status{color:var(--muted);font-size:12px;margin-inline-start:auto}
+    #map{height:58vh;min-height:390px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#17251d}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:15px}
+    .panel h2{font-size:17px;margin:0 0 12px}.muted{color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    label{display:block;font-size:12px;color:#c5d2c9;margin-bottom:5px}
+    input,select,textarea{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#09150f;color:var(--white);font:inherit;outline:none}
+    textarea{min-height:78px;resize:vertical}.full{grid-column:1/-1}
+    .hidden{display:none!important}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .pitch-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+    .pitch{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+    .pitch img{width:100%;height:135px;object-fit:cover;background:#203329}.pitch .body{padding:12px}
+    .pitch h3{font-size:15px;margin:0 0 6px}.price{color:var(--green);font-weight:800}.pitch small{color:var(--muted)}
+    .modal{position:fixed;inset:0;background:#000b;z-index:1000;display:grid;place-items:center;padding:14px}
+    .modalbox{width:min(520px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px}
+    .modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.close{background:#26372d;color:#fff;padding:7px 11px}
+    .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#102018;color:#f4f8f4}.leaflet-popup-content{font-family:system-ui}
+    footer{text-align:center;color:var(--muted);font-size:11px;padding:15px}
+    @media(min-width:850px){main{grid-template-columns:minmax(0,1.6fr) minmax(310px,.8fr);align-items:start}#map{height:70vh}.side{display:grid;gap:14px}.listing{grid-column:1/-1}}
+  </style>
+</head>
+<body>
+<header>
+  <div><div class="brand">KORA <span>MAP</span></div><div class="tag">دليلك لملاعب الكرة في طنطا</div></div>
+  <button class="secondary" id="loginOpen">دخول المالك</button>
+</header>
+<main>
+  <section>
+    <div class="toolbar" style="margin-bottom:10px">
+      <button id="locateBtn">📍 موقعي</button>
+      <button class="secondary" id="refreshBtn">تحديث الملاعب</button>
+      <span class="status" id="status">جاري الاتصال...</span>
+    </div>
+    <div id="map"></div>
+  </section>
+  <aside class="side">
+    <section class="panel">
+      <h2>ابحث عن ملعب</h2>
+      <input id="search" placeholder="ابحث بالاسم أو المنطقة">
+      <p class="muted">اختار علامة على الخريطة لعرض بيانات الملعب.</p>
+    </section>
+    <section class="panel hidden" id="adminPanel">
+      <h2>لوحة تحكم المالك</h2>
+      <p class="muted">أنت مسجل كمالك KORA MAP.</p>
+      <div class="actions"><button id="addOpen">＋ إضافة ملعب من موقعي</button><button class="secondary" id="logoutBtn">تسجيل الخروج</button></div>
+    </section>
+    <section class="panel" id="loginHint">
+      <h2>أضف ملعبك إلى الخريطة</h2>
+      <p class="muted">إضافة الملاعب وإدارتها متاحة لمالك المنصة فقط.</p>
+    </section>
+  </aside>
+  <section class="panel listing">
+    <h2>الملاعب المتاحة</h2>
+    <div id="pitchList" class="pitch-list"><p class="muted">جاري تحميل الملاعب...</p></div>
+  </section>
+</main>
+<footer>KORA MAP © 2026 · طنطا، مصر</footer>
+
+<div class="modal hidden" id="loginModal">
+  <div class="modalbox">
+    <div class="modalhead"><h2>دخول المالك</h2><button class="close" data-close="loginModal">✕</button></div>
+    <form id="loginForm">
+      <label>البريد الإلكتروني</label><input id="email" type="email" autocomplete="username" required value="Mohamedelhefny992@gmail.com">
+      <label style="margin-top:10px">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required>
+      <div class="actions"><button type="submit">تسجيل الدخول</button></div>
+    </form>
+    <p class="muted" id="loginMessage">استخدم كلمة المرور التي عيّنتها لحسابك في Supabase.</p>
+  </div>
+</div>
+
+<div class="modal hidden" id="pitchModal">
+  <div class="modalbox">
+    <div class="modalhead"><h2 id="pitchModalTitle">إضافة ملعب</h2><button class="close" data-close="pitchModal">✕</button></div>
+    <form id="pitchForm">
+      <input type="hidden" id="pitchId">
+      <div class="grid">
+        <div class="full"><label>اسم الملعب *</label><input id="pName" required placeholder="مثال: ملعب النجوم"></div>
+        <div><label>المنطقة</label><input id="pArea" placeholder="مثال: الاستاد"></div>
+        <div><label>سعر الساعة بالجنيه</label><input id="pPrice" type="number" min="0" step="1"></div>
+        <div><label>نوع الملعب</label><select id="pType"><option value="خماسي">خماسي</option><option value="سداسي">سداسي</option><option value="سباعي">سباعي</option><option value="قانوني">قانوني</option><option value="أخرى">أخرى</option></select></div>
+        <div><label>رقم التواصل</label><input id="pPhone" type="tel" placeholder="01xxxxxxxxx"></div>
+        <div class="full"><label>وصف الملعب</label><textarea id="pDescription"></textarea></div>
+        <div class="full"><label>صور الملعب</label><input id="pPhotos" type="file" accept="image/*" multiple><small class="muted">يمكن اختيار أكثر من صورة. الصور تُرفع إلى مساحة KORA MAP.</small></div>
+        <div><label>خط العرض Latitude</label><input id="pLat" type="number" step="any" required></div>
+        <div><label>خط الطول Longitude</label><input id="pLng" type="number" step="any" required></div>
+      </div>
+      <div class="actions"><button type="button" class="secondary" id="captureGps">📍 استخدم موقعي الحالي</button><button type="submit" id="savePitch">حفظ الملعب</button></div>
+      <p class="muted" id="pitchMessage">اسم الملعب والإحداثيات مطلوبة. السماح للموقع مطلوب عند استخدام GPS.</p>
+    </form>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  const SUPABASE_URL = "https://nqmsjcdikdbvkigwpryh.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_1qx9AnlJg09pkhZoEudKFA_KlJn1q4W";
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const $ = id => document.getElementById(id);
+  const status = msg => $("status").textContent = msg;
+  let pitches = [], markers = [], isAdmin = false, editing = false;
+  const map = L.map("map", {zoomControl:true}).setView([30.7865,31.0004],13);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:20
+  }).addTo(map);
+  const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function showModal(id){$(id).classList.remove("hidden")}
+  function hideModal(id){$(id).classList.add("hidden")}
+  document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>hideModal(b.dataset.close));
+  $("loginOpen").onclick=()=>showModal("loginModal");
+  function markerPopup(p) {
+    const photo = p.image_urls && p.image_urls[0] ? `<img src="${escapeHtml(p.image_urls[0])}" style="width:190px;height:95px;object-fit:cover;border-radius:8px">` : "";
+    return `${photo}<b>${escapeHtml(p.name)}</b><br>${escapeHtml(p.area||"طنطا")}<br><b>${p.price_per_hour ? escapeHtml(p.price_per_hour)+" جنيه/ساعة" : "السعر غير محدد"}</b>${p.phone?`<br><a href="tel:${escapeHtml(p.phone)}">اتصال بالملعب</a>`:""}`;
+  }
+  function render() {
+    markers.forEach(m=>map.removeLayer(m)); markers=[];
+    const q=$("search").value.trim().toLowerCase();
+    const filtered=pitches.filter(p=>(p.name+" "+(p.area||"")).toLowerCase().includes(q));
+    filtered.forEach(p=>{
+      const m=L.marker([p.latitude,p.longitude]).addTo(map).bindPopup(markerPopup(p));
+      markers.push(m);
+    });
+    $("pitchList").innerHTML = filtered.length ? filtered.map(p=>`
+      <article class="pitch">
+        ${p.image_urls&&p.image_urls[0]?`<img src="${escapeHtml(p.image_urls[0])}" alt="${escapeHtml(p.name)}">`:`<div style="height:135px;display:grid;place-items:center;color:#a3ff3f;font-size:38px">⚽</div>`}
+        <div class="body"><h3>${escapeHtml(p.name)}</h3><small>${escapeHtml(p.area||"طنطا")} · ${escapeHtml(p.pitch_type||"ملعب كرة")}</small>
+        <p class="price">${p.price_per_hour?escapeHtml(p.price_per_hour)+" جنيه / الساعة":"السعر عند التواصل"}</p>
+        ${p.phone?`<a href="tel:${escapeHtml(p.phone)}" style="color:#a3ff3f">اتصل بالملعب</a>`:""}
+        ${isAdmin?`<div class="actions"><button class="secondary" data-edit="${p.id}">تعديل</button><button class="danger" data-delete="${p.id}">حذف</button><button class="secondary" data-publish="${p.id}" data-state="${p.is_published}">${p.is_published?"إخفاء":"نشر"}</button></div>`:""}
+        </div></article>`).join("") : '<p class="muted">لا توجد ملاعب منشورة حاليًا. تابعنا قريبًا.</p>';
+    $("pitchList").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editPitch(Number(b.dataset.edit)));
+    $("pitchList").querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>deletePitch(Number(b.dataset.delete)));
+    $("pitchList").querySelectorAll("[data-publish]").forEach(b=>b.onclick=()=>togglePublish(Number(b.dataset.publish),b.dataset.state==="true"));
+  }
+  async function loadPitches() {
+    status("جاري تحميل الملاعب...");
+    const {data,error}=await db.from("pitches").select("*").order("created_at",{ascending:false});
+    if(error){status("تعذر تحميل البيانات");console.error(error);return}
+    pitches=data||[]; render(); status(`تم تحميل ${pitches.length} ملعب`);
+  }
+  async function checkAdmin() {
+    const {data:{session}}=await db.auth.getSession();
+    if(!session){isAdmin=false;updateAdminUI();return}
+    const {data,error}=await db.from("kora_admins").select("user_id").eq("user_id",session.user.id).maybeSingle();
+    isAdmin=!!data&&!error; updateAdminUI();
+    if(error) console.warn("Admin check:",error.message);
+  }
+  function updateAdminUI(){
+    $("adminPanel").classList.toggle("hidden",!isAdmin);
+    $("loginHint").classList.toggle("hidden",isAdmin);
+    $("loginOpen").classList.toggle("hidden",isAdmin);
+    render();
+  }
+  $("loginForm").onsubmit=async e=>{
+    e.preventDefault(); $("loginMessage").textContent="جاري تسجيل الدخول...";
+    const {error}=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+    if(error){$("loginMessage").textContent="تعذر الدخول: "+error.message;return}
+    await checkAdmin(); hideModal("loginModal"); $("password").value="";
+    if(!isAdmin){$("loginMessage").textContent="تم الدخول، لكن الحساب غير مسجل كمالك في kora_admins.";showModal("loginModal");return}
+    status("تم تسجيل دخول المالك");
+  };
+  $("logoutBtn").onclick=async()=>{await db.auth.signOut();isAdmin=false;updateAdminUI();status("تم تسجيل الخروج")};
+  db.auth.onAuthStateChange(()=>setTimeout(checkAdmin,0));
+  function getGPS() {
+    return new Promise((resolve,reject)=>{
+      if(!navigator.geolocation)return reject(new Error("المتصفح لا يدعم تحديد الموقع"));
+      navigator.geolocation.getCurrentPosition(pos=>resolve(pos.coords),err=>reject(err),{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+    });
+  }
+  async function captureGPS() {
+    $("pitchMessage").textContent="جاري تحديد موقعك...";
+    try{const c=await getGPS();$("pLat").value=c.latitude.toFixed(7);$("pLng").value=c.longitude.toFixed(7);map.setView([c.latitude,c.longitude],16);$("pitchMessage").textContent="تم تحديد الإحداثيات بنجاح."}
+    catch(e){$("pitchMessage").textContent="لم نتمكن من تحديد الموقع. فعّل إذن الموقع للمتصفح وحاول مجددًا."}
+  }
+  $("locateBtn").onclick=async()=>{try{const c=await getGPS();map.setView([c.latitude,c.longitude],16);L.circleMarker([c.latitude,c.longitude],{radius:8,color:"#a3ff3f"}).addTo(map).bindPopup("موقعك الحالي").openPopup()}catch(e){alert("اسمح للمتصفح باستخدام موقعك ثم حاول مرة أخرى.")}};
+  $("captureGps").onclick=captureGPS;
+  $("addOpen").onclick=async()=>{editing=false;$("pitchForm").reset();$("pitchId").value="";$("pitchModalTitle").textContent="إضافة ملعب جديد";showModal("pitchModal");await captureGPS()};
+  async function uploadPhotos(files, oldUrls=[]) {
+    const urls=[...oldUrls];
+    for(const file of files){
+      const ext=(file.name.split(".").pop()||"jpg").replace(/[^a-zA-Z0-9]/g,"");
+      const path=`${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const {error}=await db.storage.from("pitch-photos").upload(path,file,{upsert:false,contentType:file.type||"image/jpeg"});
+      if(error)throw error;
+      const {data}=db.storage.from("pitch-photos").getPublicUrl(path);urls.push(data.publicUrl);
+    }
+    return urls;
+  }
+  $("pitchForm").onsubmit=async e=>{
+    e.preventDefault();if(!isAdmin){alert("يجب تسجيل الدخول كمالك أولًا");return}
+    const btn=$("savePitch");btn.disabled=true;btn.textContent="جاري الحفظ...";
+    try{
+      const id=$("pitchId").value;
+      const old=pitches.find(p=>String(p.id)===id);
+      const files=[...$("pPhotos").files];
+      const image_urls=await uploadPhotos(files,old?.image_urls||[]);
+      const payload={name:$("pName").value.trim(),area:$("pArea").value.trim(),price_per_hour:$("pPrice").value?Number($("pPrice").value):null,pitch_type:$("pType").value,phone:$("pPhone").value.trim(),description:$("pDescription").value.trim(),latitude:Number($("pLat").value),longitude:Number($("pLng").value),image_urls,is_published:old?old.is_published:false};
+      const result=id?await db.from("pitches").update(payload).eq("id",id):await db.from("pitches").insert(payload);
+      if(result.error)throw result.error;
+      hideModal("pitchModal");$("pitchForm").reset();await loadPitches();
+    }catch(err){$("pitchMessage").textContent="فشل الحفظ: "+(err.message||"خطأ غير معروف");console.error(err)}
+    finally{btn.disabled=false;btn.textContent="حفظ الملعب"}
+  };
+  function editPitch(id){
+    const p=pitches.find(x=>x.id===id);if(!p)return;editing=true;
+    $("pitchId").value=p.id;$("pName").value=p.name;$("pArea").value=p.area||"";$("pPrice").value=p.price_per_hour??"";$("pType").value=p.pitch_type||"خماسي";$("pPhone").value=p.phone||"";$("pDescription").value=p.description||"";$("pLat").value=p.latitude;$("pLng").value=p.longitude;$("pPhotos").value="";
+    $("pitchModalTitle").textContent="تعديل بيانات الملعب";$("pitchMessage").textContent="اختيار صور جديدة يضيفها إلى صور الملعب الحالية.";showModal("pitchModal");
+  }
+  async function deletePitch(id){if(!confirm("متأكد إنك عايز تحذف الملعب؟"))return;const {error}=await db.from("pitches").delete().eq("id",id);if(error){alert(error.message);return}await loadPitches()}
+  async function togglePublish(id,current){const {error}=await db.from("pitches").update({is_published:!current}).eq("id",id);if(error){alert(error.message);return}await loadPitches()}
+  $("search").oninput=render;$("refreshBtn").onclick=loadPitches;
+  checkAdmin().then(loadPitches);
+})();
+</script>
+</body>
+</html>
